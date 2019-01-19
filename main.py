@@ -9,7 +9,7 @@ from midi2audio import FluidSynth
 from tempfile import NamedTemporaryFile
 from rtmidi.midiutil import open_midiinput, open_midioutput
 from rtmidi.midiconstants import NOTE_OFF, NOTE_ON
-from midiutil import MIDIFile
+from mido import Message, MidiFile, MidiTrack, second2tick
 import os
 
 PORT_NUMBER = os.environ["MIDI_PORT_NUMBER"]
@@ -73,9 +73,11 @@ class Recorder(object):
         self._feedback = musical_feedback
         self._recording_started = None
         self._midifile = None
+        self._miditrack = None
         self._started_recording = None
         self._recording_timeout = None
         self._rearm_timeout = None
+        self._last_recorded_event = None
 
     def arm_recording(self):
         if self._armed:
@@ -101,9 +103,10 @@ class Recorder(object):
         self._recording_started = None
         self._recording_timeout.cancel()
         self._recording_timeout = None
+        self._last_recorded_event = None
         slack("_just stopped recording_")
         with NamedTemporaryFile("wb", suffix='.mid') as midi_output:
-            self._midifile.writeFile(midi_output)
+            self._midifile.save(file = midi_output)
             midi_output.flush()
             fs = FluidSynth(SOUNDFONT_PATH)
             fs.midi_to_audio(midi_output.name, midi_output.name + ".wav")
@@ -122,35 +125,53 @@ class Recorder(object):
                     title="test.wav"
                 )
         self._midifile = None
+        self._miditrack = None
 
     def start_recording(self, start_time):
         if self._recording:
             return
         self._recording = True
         self._started_recording = start_time
-        self._midifile = MIDIFile(1)
+        self._midifile = MidiFile()
+        self._miditrack = MidiTrack()
+        self._midifile.tracks.append(self._miditrack)
         self._recording_timeout = ResettableTimer(15, self.stop_recording)
         self._recording_timeout.start()
+        self._last_recorded_event = None
         slack("_just started recording_")
 
-    def record_note(self, note, velocity, duration, start_time):
-        if velocity == 0:
-            velocity = 100
-
+    def record_event(self, event, note, velocity, t):
         if self._rearm_timeout:
             self._rearm_timeout.reset()
         if not self._recording and self._armed:
-            self.start_recording(start_time)
+            self.start_recording(t)
         if self._recording:
             self._recording_timeout.reset()
-            self._midifile.addNote(0, 0, note, start_time - self._started_recording, duration, velocity)
+            if self._last_recorded_event is None:
+                self._last_recorded_event = t
+            self._miditrack.append(Message(event, note=note, velocity=velocity, time=int(second2tick(t - self._last_recorded_event, self._midifile.ticks_per_beat, 120))))
+            self._last_recorded_event = t
+
+    def shutdown(self):
+        self.stop_recording()
+
+    # def record_note(self, note, velocity, duration, start_time):
+    #     if velocity == 0:
+    #         velocity = 100
+    #
+    #     if self._rearm_timeout:
+    #         self._rearm_timeout.reset()
+    #     if not self._recording and self._armed:
+    #         self.start_recording(start_time)
+    #     if self._recording:
+    #         self._recording_timeout.reset()
+    #         self._midifile.append(Message( 0, 0, note, start_time - self._started_recording, duration, velocity)
 
     def toggle(self):
         if self._armed:
             self.disarm_recording()
         else:
             self.arm_recording()
-
 
 class MusicalFeedback(object):
     def __init__(self, out):
@@ -209,9 +230,15 @@ class Keyboard(object):
         self._active_notes_velocity[note] = velocity
         self.check_hotkeys(note)
 
+        if self._recorder:
+            self._recorder.record_event("note_on", note, velocity, t)
+
     def note_off(self, t, note, velocity):
         if not self.is_note_active(note):
             print("guard fail")
+
+        if self._recorder:
+            self._recorder.record_event("note_off", note, velocity, t)
 
         start_time = self._active_notes[note]
         # initial_velocity = self._active_notes_velocity[note]
@@ -222,8 +249,8 @@ class Keyboard(object):
             self._active_hotkey[note] = False
         else:
             duration = t - start_time
-            if self._recorder:
-                self._recorder.record_note(note, velocity, duration, start_time)
+            # if self._recorder:
+            #     self._recorder.record_note(note, velocity, duration, start_time)
 
 
 class MidiInCallback(object):
@@ -257,6 +284,7 @@ def main():
 
     musical_feedback = MusicalFeedback(midi_out)
     recorder = Recorder(musical_feedback)
+    recorder.start()
 
     keyboard = Keyboard([{
         "combo": [105, 107, 108],
@@ -277,7 +305,7 @@ def main():
         print('')
     finally:
         print("Exit.")
-        recorder.stop_recording()
+        recorder.shutdown()
         midi_in.close_port()
         midi_out.close_port()
         del midi_in
