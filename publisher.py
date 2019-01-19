@@ -59,7 +59,7 @@ class Publisher(Thread):
             with open(wav_output_name, "rb") as wav_file_handle:
                 wav_bytes = wav_file_handle.read()
                 self._slack_upload(file_prefix + ".wav", wav_bytes)
-                self._google_upload(file_prefix + ".wav", "audio/midi", wav_bytes)
+                self._google_upload(file_prefix + ".wav", "audio/wav", wav_bytes)
             os.remove(wav_output_name)
 
     def slack_text(self, text):
