@@ -14,6 +14,37 @@ NUMBER_OF_PIANO_KEYS = 120
 log = logging.getLogger('pianobot')
 logging.basicConfig(level=logging.DEBUG)
 
+class Recorder(object):
+    def __init__(self, musical_feedback):
+        self._armed = False
+        self._feedback = musical_feedback
+
+    def arm_recording(self):
+        self._armed = True
+        self._feedback.happy_sound()
+        pass
+
+    def disarm_recording(self):
+        self._armed = False
+        self._feedback.sad_sound()
+        pass
+
+    def stop_recording(self):
+        pass
+
+    def start_recording(self, start_time):
+        pass
+
+    def record_note(self, note, velocity, duration, start_time):
+        pass
+
+    def toggle(self):
+        if self._armed:
+            self.disarm_recording()
+        else:
+            self.arm_recording()
+
+
 class MusicalFeedback(object):
     def __init__(self, out):
         self._out = out
@@ -42,28 +73,50 @@ class MusicalFeedback(object):
         self._chord([61, 65, 68], 0.5)
         self._chord([60, 64, 67], 0.5)
 
+
 class Keyboard(object):
-    def __init__(self):
+    def __init__(self, commands, recorder=None):
         self._active_notes = [None] * NUMBER_OF_PIANO_KEYS
         self._active_notes_velocity = [None] * NUMBER_OF_PIANO_KEYS
+        self._active_hotkey = [False] * NUMBER_OF_PIANO_KEYS
+        self._commands = commands
+        self._special_keys = sum([commands[cmd]['combo'] for cmd in range(len(commands))], [])
+        self._recorder = recorder
 
     def is_note_active(self, note):
         return self._active_notes[note] is not None and self._active_notes_velocity[note] is not None
 
+    def check_hotkeys(self, note):
+        if note in self._special_keys:
+            for cmd in self._commands:
+                combo = cmd['combo']
+                if all(self.is_note_active(x) for x in combo):
+                    for x in combo:
+                        self._active_hotkey[x] = True
+                    fn = cmd['fn']
+                    fn()
+                    break
+
     def note_on(self, t, note, velocity):
         self._active_notes[note] = t
         self._active_notes_velocity[note] = velocity
+        self.check_hotkeys(note)
 
     def note_off(self, t, note, velocity):
         if not self.is_note_active(note):
             print("guard fail")
 
         start_time = self._active_notes[note]
-        initial_velocity = self._active_notes_velocity[note]
+        # initial_velocity = self._active_notes_velocity[note]
         self._active_notes[note] = None
         self._active_notes_velocity[note] = None
-        duration = t - start_time
-        print("Note: %d %d -> %d at %s" % (note, initial_velocity, velocity, start_time))
+
+        if self._active_hotkey[note]:
+            self._active_hotkey[note] = False
+        else:
+            duration = t - start_time
+            if self._recorder:
+                self._recorder.record_note(note, velocity, duration, start_time)
 
 
 class MidiInCallback(object):
@@ -96,10 +149,18 @@ def main():
         sys.exit()
 
     musical_feedback = MusicalFeedback(midi_out)
+    recorder = Recorder(musical_feedback)
 
-    keyboard = Keyboard()
+    keyboard = Keyboard([{
+        "combo": [105, 107, 108],
+        "fn": recorder.toggle
+    }, {
+        "combo": [64, 65, 62],
+        "fn": recorder.toggle
+    }], recorder)
 
     midi_in.set_callback(MidiInCallback(keyboard))
+    recorder.arm_recording()
 
     print("Entering main Pianobot loop. Press Control-C to exit.")
     musical_feedback.happy_chords()
@@ -110,6 +171,7 @@ def main():
         print('')
     finally:
         print("Exit.")
+        recorder.stop_recording()
         midi_in.close_port()
         midi_out.close_port()
         del midi_in
