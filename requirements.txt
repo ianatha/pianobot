@@ -1,0 +1,2 @@
+python-rtmidi==1.2.1
+midiutil==1.2.1
