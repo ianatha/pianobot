@@ -67,6 +67,7 @@ class Pianobot(object):
         finally:
             print("Exit.")
             recorder.shutdown()
+            self._publisher.shutdown()
             midi_in.close_port()
             midi_out.close_port()
             del midi_in

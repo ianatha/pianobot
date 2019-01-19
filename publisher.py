@@ -21,10 +21,13 @@ class Publisher(Thread):
         self._slack_channel = slack_channel
         service_credentials = service_account.Credentials.from_service_account_info(google_credentials_json_str,
                                                                                     scopes=GOOGLE_SCOPES)
-        self._google_drive = build('drive', 'v2', credentials=service_credentials)
+        self._google_drive = build('drive', 'v2', credentials=service_credentials, cache_discovery=False)
         self._google_folder_id = google_folder_id
 
         self._queue = Queue()
+
+    def shutdown(self):
+        self._queue.put(None)
 
     def run(self):
         while True:
