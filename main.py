@@ -2,6 +2,7 @@
 
 import logging
 import sys
+from threading import Thread, Event
 import time
 from slackclient import SlackClient
 from midi2audio import FluidSynth
@@ -10,7 +11,6 @@ from rtmidi.midiutil import open_midiinput, open_midioutput
 from rtmidi.midiconstants import NOTE_OFF, NOTE_ON
 from midiutil import MIDIFile
 import os
-
 
 PORT_NUMBER = os.environ["MIDI_PORT_NUMBER"]
 NUMBER_OF_PIANO_KEYS = 120
@@ -30,6 +30,41 @@ def slack(text):
         text=text
     )
 
+
+def ResettableTimer(*args, **kwargs):
+    return _ResettableTimer(*args, **kwargs)
+
+
+class _ResettableTimer(Thread):
+    def __init__(self, interval, fn, args=[], kwargs={}):
+        Thread.__init__(self)
+        self._interval = interval
+        self._fn = fn
+        self._args = args
+        self._kwargs = kwargs
+        self._finished = Event()
+        self._reset = True
+
+    def cancel(self):
+        self._finished.set()
+
+    def run(self):
+        while self._reset:
+            self._reset = False
+            self._finished.wait(self._interval)
+
+        if not self._finished.isSet():
+            self._fn(*self._args, **self._kwargs)
+        self._finished.set()
+
+    def reset(self, interval=None):
+        if interval:
+            self._interval = interval
+        self._reset = True
+        self._finished.set()
+        self._finished.clear()
+
+
 class Recorder(object):
     def __init__(self, musical_feedback):
         self._armed = False
@@ -38,6 +73,8 @@ class Recorder(object):
         self._recording_started = None
         self._midifile = None
         self._started_recording = None
+        self._recording_timeout = None
+        self._rearm_timeout = None
 
     def arm_recording(self):
         if self._armed:
@@ -53,12 +90,16 @@ class Recorder(object):
         self._armed = False
         self._feedback.sad_sound()
         slack("_won't record for now_")
+        self._rearm_timeout = ResettableTimer(60, self.arm_recording)
+        self._rearm_timeout.start()
 
     def stop_recording(self):
         if not self._recording:
             return
         self._recording = False
         self._recording_started = None
+        self._recording_timeout.cancel()
+        self._recording_timeout = None
         slack("_just stopped recording_")
         with NamedTemporaryFile("wb", suffix='.mid') as midi_output:
             self._midifile.writeFile(midi_output)
@@ -87,15 +128,20 @@ class Recorder(object):
         self._recording = True
         self._started_recording = start_time
         self._midifile = MIDIFile(1)
+        self._recording_timeout = ResettableTimer(15, self.stop_recording)
+        self._recording_timeout.start()
         slack("_just started recording_")
 
     def record_note(self, note, velocity, duration, start_time):
         if velocity == 0:
             velocity = 100
 
+        if self._rearm_timeout:
+            self._rearm_timeout.reset()
         if not self._recording and self._armed:
             self.start_recording(start_time)
         if self._recording:
+            self._recording_timeout.reset()
             self._midifile.addNote(0, 0, note, start_time - self._started_recording, duration, velocity)
 
     def toggle(self):
@@ -223,7 +269,6 @@ def main():
     recorder.arm_recording()
 
     print("Entering main Pianobot loop. Press Control-C to exit.")
-    musical_feedback.happy_chords()
     try:
         while True:
             time.sleep(1)
