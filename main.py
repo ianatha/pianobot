@@ -11,6 +11,7 @@ from rtmidi.midiutil import open_midiinput, open_midioutput
 from rtmidi.midiconstants import NOTE_OFF, NOTE_ON
 from mido import Message, MidiFile, MidiTrack, second2tick
 import os
+from queue import Queue
 
 PORT_NUMBER = os.environ["MIDI_PORT_NUMBER"]
 NUMBER_OF_PIANO_KEYS = 120
@@ -66,8 +67,9 @@ class _ResettableTimer(Thread):
         self._finished.clear()
 
 
-class Recorder(object):
+class Recorder(Thread):
     def __init__(self, musical_feedback):
+        Thread.__init__(self)
         self._armed = False
         self._recording = False
         self._feedback = musical_feedback
@@ -78,6 +80,16 @@ class Recorder(object):
         self._recording_timeout = None
         self._rearm_timeout = None
         self._last_recorded_event = None
+        self._queue = Queue()
+
+    def run(self):
+        while True:
+            item = self._queue.get()
+            if item is None:
+                break
+            event, note, velocity, t = item
+            self._record_event(event, note, velocity, t)
+            self._queue.task_done()
 
     def arm_recording(self):
         if self._armed:
@@ -141,6 +153,11 @@ class Recorder(object):
         slack("_just started recording_")
 
     def record_event(self, event, note, velocity, t):
+        print("enq event %s %s %s" % (event, note, velocity))
+        self._queue.put([event, note, velocity, t])
+
+    def _record_event(self, event, note, velocity, t):
+        print("processing real event %s %s %s" % (event, note, velocity))
         if self._rearm_timeout:
             self._rearm_timeout.reset()
         if not self._recording and self._armed:
@@ -154,6 +171,7 @@ class Recorder(object):
 
     def shutdown(self):
         self.stop_recording()
+        self._queue.put(None)
 
     # def record_note(self, note, velocity, duration, start_time):
     #     if velocity == 0:
