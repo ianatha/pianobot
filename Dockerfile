@@ -8,6 +8,8 @@ RUN apt-get update \
 	libjack-dev \
 	python3.6 \
 	python3.6-dev \
+	fluidsynth \
+	fluid-soundfont-gm \
 	&& rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip

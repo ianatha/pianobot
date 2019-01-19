@@ -3,40 +3,100 @@
 import logging
 import sys
 import time
+from slackclient import SlackClient
+from midi2audio import FluidSynth
+from tempfile import NamedTemporaryFile
 from rtmidi.midiutil import open_midiinput, open_midioutput
 from rtmidi.midiconstants import NOTE_OFF, NOTE_ON
 from midiutil import MIDIFile
 import os
 
+
 PORT_NUMBER = os.environ["MIDI_PORT_NUMBER"]
 NUMBER_OF_PIANO_KEYS = 120
+SLACK_CHANNEL = os.environ["SLACK_CHANNEL"]
+SLACK_API_TOKEN = os.environ["SLACK_API_TOKEN"]
 
 log = logging.getLogger('pianobot')
 logging.basicConfig(level=logging.DEBUG)
 
+slack_client = SlackClient(SLACK_API_TOKEN)
+
+
+def slack(text):
+    res = slack_client.api_call(
+        "chat.postMessage",
+        channel=SLACK_CHANNEL,
+        text=text
+    )
+
 class Recorder(object):
     def __init__(self, musical_feedback):
         self._armed = False
+        self._recording = False
         self._feedback = musical_feedback
+        self._recording_started = None
+        self._midifile = None
+        self._started_recording = None
 
     def arm_recording(self):
+        if self._armed:
+            return
         self._armed = True
         self._feedback.happy_sound()
-        pass
+        slack("_will record when someone plays_")
 
     def disarm_recording(self):
+        if not self._armed:
+            return
+        self.stop_recording()
         self._armed = False
         self._feedback.sad_sound()
-        pass
+        slack("_won't record for now_")
 
     def stop_recording(self):
-        pass
+        if not self._recording:
+            return
+        self._recording = False
+        self._recording_started = None
+        slack("_just stopped recording_")
+        with NamedTemporaryFile("wb", suffix='.mid') as midi_output:
+            self._midifile.writeFile(midi_output)
+            midi_output.flush()
+            fs = FluidSynth()
+            fs.midi_to_audio(midi_output.name, midi_output.name + ".wav")
+            with open(midi_output.name, "rb") as file_content:
+                res = slack_client.api_call(
+                    "files.upload",
+                    channels=SLACK_CHANNEL,
+                    file=file_content,
+                    title="test.mid"
+                )
+            with open(midi_output.name + ".wav", "rb") as file_content:
+                res = slack_client.api_call(
+                    "files.upload",
+                    channels=SLACK_CHANNEL,
+                    file=file_content,
+                    title="test.wav"
+                )
+        self._midifile = None
 
     def start_recording(self, start_time):
-        pass
+        if self._recording:
+            return
+        self._recording = True
+        self._started_recording = start_time
+        self._midifile = MIDIFile(1)
+        slack("_just started recording_")
 
     def record_note(self, note, velocity, duration, start_time):
-        pass
+        if velocity == 0:
+            velocity = 100
+
+        if not self._recording and self._armed:
+            self.start_recording(start_time)
+        if self._recording:
+            self._midifile.addNote(0, 0, note, start_time - self._started_recording, duration, velocity)
 
     def toggle(self):
         if self._armed:
