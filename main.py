@@ -1,67 +1,87 @@
 #!/usr/bin/env python
+
 import logging
 import sys
 import time
-
 from rtmidi.midiutil import open_midiinput
 from rtmidi.midiconstants import NOTE_OFF, NOTE_ON
+from midiutil import MIDIFile
+import os
 
-active_notes = [None] * 120
-active_notes_velocity = [None] * 120
+PORT_NUMBER = os.environ["MIDI_PORT_NUMBER"]
+NUMBER_OF_PIANO_KEYS = 120
 
-def is_key_pressed(note):
-    return active_notes[note] is not None and active_notes_velocity[note] is not None
+log = logging.getLogger('pianobot')
+logging.basicConfig(level=logging.DEBUG)
 
-class MidiInputHandler(object):
-    def __init__(self, port):
-        self.port = port
+
+class Keyboard(object):
+    def __init__(self):
+        self._active_notes = [None] * NUMBER_OF_PIANO_KEYS
+        self._active_notes_velocity = [None] * NUMBER_OF_PIANO_KEYS
+
+    def is_note_active(self, note):
+        return self._active_notes[note] is not None and self._active_notes_velocity[note] is not None
+
+    def note_on(self, t, note, velocity):
+        self._active_notes[note] = t
+        self._active_notes_velocity[note] = velocity
+
+    def note_off(self, t, note, velocity):
+        if not self.is_note_active(note):
+            print("guard fail")
+
+        start_time = self._active_notes[note]
+        initial_velocity = self._active_notes_velocity[note]
+        self._active_notes[note] = None
+        self._active_notes_velocity[note] = None
+        duration = t - start_time
+        print("Note: %d %d -> %d at %s" % (note, initial_velocity, velocity, start_time))
+
+
+class MidiInCallback(object):
+    def __init__(self, keyboard):
         self._wallclock = time.time()
+        self._keyboard = keyboard
 
     def __call__(self, event, data=None):
         message, deltatime = event
         self._wallclock += deltatime
-        if message[0] == NOTE_ON:
-            t = self._wallclock
-            note = message[1]
-            velocity = message[2]
-            active_notes[note] = t
-            active_notes_velocity[note] = velocity
-        elif message[0] == NOTE_OFF:
-            t = self._wallclock
-            note = message[1]
-            if not is_key_pressed(note):
-                print("guard fail")
-            start_time = active_notes[note]
-            duration = t - start_time
-            velocity = active_notes_velocity[note]
 
-            active_notes[note] = None
-            active_notes_velocity[note] = None
+        t = self._wallclock
+        event_type = message[0]
+        note = message[1]
+        velocity = message[2]
 
-            print("Note %d, velocity %d, duration %f, start %f" % (note, velocity, duration, start_time))
+        if event_type == NOTE_ON:
+            self._keyboard.note_on(t, note, velocity)
+        elif event_type == NOTE_OFF:
+            self._keyboard.note_off(t, note, velocity)
         else:
-            print("uncognized message")
-            print(message)
+            print("Unrecognized message: %s" % message)
 
-port = sys.argv[1] if len(sys.argv) > 1 else None
 
-try:
-    midiin, port_name = open_midiinput(1)
-except (EOFError, KeyboardInterrupt):
-    sys.exit()
+def main():
+    try:
+        midi_in, in_port_name = open_midiinput(PORT_NUMBER)
+    except (EOFError, KeyboardInterrupt):
+        sys.exit()
 
-print("Attaching MIDI input callback handler.")
-midiin.set_callback(MidiInputHandler(port_name))
+    keyboard = Keyboard()
 
-print("Entering main loop. Press Control-C to exit.")
-try:
-    while True:
-        time.sleep(1)
-except KeyboardInterrupt:
-    print('')
-finally:
-    print("Exit.")
-    midiin.close_port()
-    midiout.close_port()
-    del midiin
-    del midiout
+    midi_in.set_callback(MidiInCallback(keyboard))
+
+    print("Entering main Pianobot loop. Press Control-C to exit.")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print('')
+    finally:
+        print("Exit.")
+        midi_in.close_port()
+        del midi_in
+
+
+if __name__ == "__main__":
+    main()
