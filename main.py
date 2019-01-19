@@ -16,6 +16,7 @@ PORT_NUMBER = os.environ["MIDI_PORT_NUMBER"]
 NUMBER_OF_PIANO_KEYS = 120
 SLACK_CHANNEL = os.environ["SLACK_CHANNEL"]
 SLACK_API_TOKEN = os.environ["SLACK_API_TOKEN"]
+SOUNDFONT_PATH = os.environ["SOUNDFONT_PATH"]
 
 log = logging.getLogger('pianobot')
 logging.basicConfig(level=logging.DEBUG)
@@ -104,7 +105,7 @@ class Recorder(object):
         with NamedTemporaryFile("wb", suffix='.mid') as midi_output:
             self._midifile.writeFile(midi_output)
             midi_output.flush()
-            fs = FluidSynth()
+            fs = FluidSynth(SOUNDFONT_PATH)
             fs.midi_to_audio(midi_output.name, midi_output.name + ".wav")
             with open(midi_output.name, "rb") as file_content:
                 res = slack_client.api_call(

@@ -22,4 +22,6 @@ RUN pip install -r requirements.txt
 
 COPY . /usr/src/app
 
+ENV SOUNDFONT_PATH /usr/share/sounds/sf2/FluidR3_GM.sf2
+
 CMD ["python", "main.py"]
