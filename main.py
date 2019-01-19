@@ -12,12 +12,19 @@ from rtmidi.midiconstants import NOTE_OFF, NOTE_ON
 from mido import Message, MidiFile, MidiTrack, second2tick
 import os
 from queue import Queue
+import json
+from base64 import b64decode
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
 PORT_NUMBER = os.environ["MIDI_PORT_NUMBER"]
 NUMBER_OF_PIANO_KEYS = 120
 SLACK_CHANNEL = os.environ["SLACK_CHANNEL"]
 SLACK_API_TOKEN = os.environ["SLACK_API_TOKEN"]
 SOUNDFONT_PATH = os.environ["SOUNDFONT_PATH"]
+GOOGLE_CREDENTIALS_JSON_STRING = json.loads(b64decode(os.environ["GOOGLE_CREDENTIALS_JSON"]))
+GOOGLE_FOLDER_ID = os.environ["GOOGLE_FOLDER_ID"]
+GOOGLE_SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 log = logging.getLogger('pianobot')
 logging.basicConfig(level=logging.DEBUG)
@@ -108,6 +115,18 @@ class Recorder(Thread):
         self._rearm_timeout = ResettableTimer(60, self.arm_recording)
         self._rearm_timeout.start()
 
+    def _google_upload(self, name, body):
+        service_credentials = service_account.Credentials.from_service_account_info(GOOGLE_CREDENTIALS_JSON_STRING, scopes=GOOGLE_SCOPES)
+        drive_service = build('drive', 'v2', credentials=service_credentials)
+        file_metadata = {
+            'title': name,
+            'parents': [{'id': GOOGLE_FOLDER_ID}]
+        }
+        file_insert = drive_service.files.insert(body=file_metadata,
+                                   media_body=body,
+                                   fields='id').execute()
+        print('File ID: %s' % file_insert.get('id'))
+
     def stop_recording(self):
         if not self._recording:
             return
@@ -122,13 +141,16 @@ class Recorder(Thread):
             midi_output.flush()
             fs = FluidSynth(SOUNDFONT_PATH)
             fs.midi_to_audio(midi_output.name, midi_output.name + ".wav")
-            with open(midi_output.name, "rb") as file_content:
+            with open(midi_output.name, "rb") as midi_file_handle:
+                midi_bytes = midi_file_handle.read()
                 res = slack_client.api_call(
                     "files.upload",
                     channels=SLACK_CHANNEL,
-                    file=file_content,
+                    file=midi_bytes,
                     title="test.mid"
                 )
+                self._google_upload("test.mid", midi_bytes)
+
             with open(midi_output.name + ".wav", "rb") as file_content:
                 res = slack_client.api_call(
                     "files.upload",
