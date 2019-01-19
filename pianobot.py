@@ -20,12 +20,14 @@ class MidiInCallback(object):
 
         t = self._wallclock
         event_type = message[0]
-        note = message[1]
-        velocity = message[2]
 
         if event_type == NOTE_ON:
+            note = message[1]
+            velocity = message[2]
             self._keyboard.note_on(t, note, velocity, deltatime)
         elif event_type == NOTE_OFF:
+            note = message[1]
+            velocity = message[2]
             self._keyboard.note_off(t, note, velocity, deltatime)
         else:
             print("Unrecognized message: %s" % message)
@@ -49,10 +51,10 @@ class Pianobot(object):
 
         keyboard = Keyboard([{
             "combo": [105, 107, 108],
-            "fn": lambda: recorder.arm_recording(force_feedback=True)
+            "fn": lambda: recorder.arm_public()
         }, {
             "combo": [102, 104, 106],
-            "fn": lambda: recorder.disarm_recording(force_feedback=True)
+            "fn": lambda: recorder.disarm_recording()
         }], recorder)
 
         midi_in.set_callback(MidiInCallback(keyboard))

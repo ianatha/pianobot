@@ -9,13 +9,31 @@ from resettable_timer import ResettableTimer
 
 DEFAULT_BPM = 120
 RECORDING_END_TIMEOUT = 15
-RECORDING_REARM_TIMEOUT = 5 * 60
+RECORDING_REARM_TIMEOUT = 3 * 60
 
+##
+# rightmost sustain pedal
 
+# 19.01.19 19:46:12 (-0800)  main  Unrecognized message: [176, 64, 17]
+# 19.01.19 19:46:12 (-0800)  main  Unrecognized message: [176, 64, 42]
+# 19.01.19 19:46:12 (-0800)  main  Unrecognized message: [176, 64, 75]
+# 19.01.19 19:46:12 (-0800)  main  Unrecognized message: [176, 64, 127]
+# 19.01.19 19:46:12 (-0800)  main  Unrecognized message: [176, 64, 39]
+# 19.01.19 19:46:12 (-0800)  main  Unrecognized message: [176, 64, 0]
+
+# leftmost pedal
+# 19.01.19 19:46:38 (-0800)  main  Unrecognized message: [176, 67, 127]
+# 19.01.19 19:46:38 (-0800)  main  Unrecognized message: [176, 67, 0]
+# 19.01.19 19:46:39 (-0800)  main  Unrecognized message: [176, 67, 127]
+# 19.01.19 19:46:39 (-0800)  main  Unrecognized message: [176, 67, 0]
+#middle pedal
+#19.01.19 19:46:52 (-0800)  main  Unrecognized message: [176, 66, 127]
+#19.01.19 19:46:53 (-0800)  main  Unrecognized message: [176, 66, 0]
 class Recorder(Thread):
     def __init__(self, musical_feedback, publisher):
         Thread.__init__(self)
         self._armed = False
+        self._armed_public = False
         self._recording = False
         self._feedback = musical_feedback
         self._publisher = publisher
@@ -36,23 +54,26 @@ class Recorder(Thread):
             self._record_event(event, note, velocity, t, deltatime)
             self._queue.task_done()
 
-    def arm_recording(self, force_feedback=False):
+    def arm_public(self):
+        self.arm_recording()
+        self._armed_public = True
+        self._feedback.happy_sound()
+        # self._publisher.slack_text("_the next session will be publicized_")
+        pass
+
+    def arm_recording(self):
         if self._armed:
-            if force_feedback:
-                self._feedback.happy_sound()
             return
         self._armed = True
-        self._feedback.happy_sound()
-        self._publisher.slack_text("_will record when someone plays_")
+        self._publisher.slack_text("_will record for research purposes only when someone plays_")
 
-    def disarm_recording(self, force_feedback=False):
+    def disarm_recording(self):
         if not self._armed:
-            if force_feedback:
-                self._feedback.sad_sound()
+            self._feedback.sad_sound()
             return
+        self.stop_recording()
         self._publisher.slack_text("_won't record for now_")
         self._armed = False
-        self.stop_recording()
         self._feedback.sad_sound()
         self._rearm_timeout = ResettableTimer(RECORDING_REARM_TIMEOUT, self.arm_recording)
         self._rearm_timeout.start()
@@ -65,13 +86,15 @@ class Recorder(Thread):
         self._started_recording = None
         self._recording_timeout.cancel()
         self._recording_timeout = None
+        if self._last_recorded_event is None:
+            return
         self._last_recorded_event = None
-        self._publisher.slack_text("_just stopped recording_")
 
         midi_bytes = BytesIO()
         self._midifile.save(file=midi_bytes)
-        self._publisher.publish_midi_file(file_prefix, midi_bytes.getbuffer())
+        self._publisher.publish_midi_file(file_prefix, midi_bytes.getbuffer(), public=self._armed_public)
         del midi_bytes
+        self._armed_public = False
         self._midifile = None
         self._miditrack = None
 
@@ -86,7 +109,8 @@ class Recorder(Thread):
         self._recording_timeout = ResettableTimer(RECORDING_END_TIMEOUT, self.stop_recording)
         self._recording_timeout.start()
         self._last_recorded_event = None
-        self._publisher.slack_text("_just started recording_")
+        if self._armed_public:
+            self._publisher.slack_text("_just started a recording for public consumption_")
 
     def record_event(self, event, note, velocity, t, deltatime):
         self._queue.put([event, note, velocity, t, deltatime])

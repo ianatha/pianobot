@@ -14,11 +14,13 @@ from slackclient import SlackClient
 GOOGLE_SCOPES = ['https://www.googleapis.com/auth/drive']
 SOUNDFONT_PATH = os.environ["SOUNDFONT_PATH"]
 
+
 class Publisher(Thread):
-    def __init__(self, slack_api_token, slack_channel, google_credentials_json_str, google_folder_id):
+    def __init__(self, slack_api_token, slack_channel_public, slack_channel_private, google_credentials_json_str, google_folder_id):
         Thread.__init__(self)
         self._slack_client = SlackClient(slack_api_token)
-        self._slack_channel = slack_channel
+        self._slack_channel_public = slack_channel_public
+        self._slack_channel_private = slack_channel_private
         service_credentials = service_account.Credentials.from_service_account_info(google_credentials_json_str,
                                                                                     scopes=GOOGLE_SCOPES)
         self._google_drive = build('drive', 'v2', credentials=service_credentials, cache_discovery=False)
@@ -38,22 +40,24 @@ class Publisher(Thread):
                 self._slack_text(item[1])
                 pass
             elif item[0] == 'publish_midi_file':
-                self._publish_midi_file(item[1], item[2])
+                self._publish_midi_file(item[1], item[2], item[3])
             else:
                 print(item)
                 print("bad queued event. abort")
             self._queue.task_done()
 
-    def publish_midi_file(self, file_prefix, midi_bytes):
-        self._queue.put(["publish_midi_file", file_prefix, midi_bytes])
+    def publish_midi_file(self, file_prefix, midi_bytes, public):
+        self._queue.put(["publish_midi_file", file_prefix, midi_bytes, public])
 
-    def _publish_midi_file(self, file_prefix, midi_bytes):
+    def _publish_midi_file(self, file_prefix, midi_bytes, public):
         with NamedTemporaryFile("wb", prefix=file_prefix + "-", suffix='.mid') as midi_output:
             midi_output.write(midi_bytes)
             midi_output.flush()
 
-            self._slack_upload(file_prefix + ".mid", midi_bytes)
+            self._slack_upload_private(file_prefix + ".mid", midi_bytes)
             self._google_upload(file_prefix + ".mid", "audio/midi", midi_bytes)
+            if public:
+                self._slack_upload_public(file_prefix + ".mid", midi_bytes)
 
             wav_output_name = midi_output.name + ".wav"
             fluidsynth = FluidSynth(SOUNDFONT_PATH)
@@ -61,8 +65,10 @@ class Publisher(Thread):
 
             with open(wav_output_name, "rb") as wav_file_handle:
                 wav_bytes = wav_file_handle.read()
-                self._slack_upload(file_prefix + ".wav", wav_bytes)
+                self._slack_upload_private(file_prefix + ".wav", wav_bytes)
                 self._google_upload(file_prefix + ".wav", "audio/wav", wav_bytes)
+                if public:
+                    self._slack_upload_public(file_prefix + ".wav", wav_bytes)
             os.remove(wav_output_name)
 
     def slack_text(self, text):
@@ -71,7 +77,7 @@ class Publisher(Thread):
     def _slack_text(self, text):
         res = self._slack_client.api_call(
             "chat.postMessage",
-            channel=self._slack_channel,
+            channel=self._slack_channel_public,
             text=text
         )
 
@@ -89,10 +95,18 @@ class Publisher(Thread):
                                                         fields='id').execute()
         return file_insert.get('id')
 
-    def _slack_upload(self, name, data):
+    def _slack_upload_public(self, name, data):
         res = self._slack_client.api_call(
             "files.upload",
-            channels=self._slack_channel,
+            channels=self._slack_channel_public,
+            file=data,
+            title=name
+        )
+
+    def _slack_upload_private(self, name, data):
+        res = self._slack_client.api_call(
+            "files.upload",
+            channels=self._slack_channel_private,
             file=data,
             title=name
         )

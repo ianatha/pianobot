@@ -11,7 +11,8 @@ from pianobot import Pianobot
 from publisher import Publisher
 
 PORT_NUMBER = os.environ["MIDI_PORT_NUMBER"]
-SLACK_CHANNEL = os.environ["SLACK_CHANNEL"]
+SLACK_CHANNEL_PUBLIC = os.environ["SLACK_CHANNEL_PUBLIC"]
+SLACK_CHANNEL_PRIVATE = os.environ["SLACK_CHANNEL_PRIVATE"]
 SLACK_API_TOKEN = os.environ["SLACK_API_TOKEN"]
 GOOGLE_CREDENTIALS_JSON_STRING = json.loads(b64decode(os.environ["GOOGLE_CREDENTIALS_JSON"]))
 GOOGLE_FOLDER_ID = os.environ["GOOGLE_FOLDER_ID"]
@@ -24,7 +25,8 @@ slack_client = SlackClient(SLACK_API_TOKEN)
 if __name__ == "__main__":
     publisher = Publisher(
         slack_api_token=SLACK_API_TOKEN,
-        slack_channel=SLACK_CHANNEL,
+        slack_channel_public=SLACK_CHANNEL_PUBLIC,
+        slack_channel_private=SLACK_CHANNEL_PRIVATE,
         google_credentials_json_str=GOOGLE_CREDENTIALS_JSON_STRING,
         google_folder_id=GOOGLE_FOLDER_ID
     )
