@@ -9,7 +9,7 @@ from resettable_timer import ResettableTimer
 
 DEFAULT_BPM = 120
 RECORDING_END_TIMEOUT = 15
-RECORDING_REARM_TIMEOUT = 60
+RECORDING_REARM_TIMEOUT = 5 * 60
 
 
 class Recorder(Thread):
@@ -36,15 +36,19 @@ class Recorder(Thread):
             self._record_event(event, note, velocity, t, deltatime)
             self._queue.task_done()
 
-    def arm_recording(self):
+    def arm_recording(self, force_feedback=False):
         if self._armed:
+            if force_feedback:
+                self._feedback.happy_sound()
             return
         self._armed = True
         self._feedback.happy_sound()
         self._publisher.slack_text("_will record when someone plays_")
 
-    def disarm_recording(self):
+    def disarm_recording(self, force_feedback=False):
         if not self._armed:
+            if force_feedback:
+                self._feedback.sad_sound()
             return
         self._publisher.slack_text("_won't record for now_")
         self._armed = False

@@ -49,10 +49,10 @@ class Pianobot(object):
 
         keyboard = Keyboard([{
             "combo": [105, 107, 108],
-            "fn": recorder.toggle
+            "fn": lambda: recorder.arm_recording(force_feedback=True)
         }, {
-            "combo": [64, 65, 62],
-            "fn": recorder.toggle
+            "combo": [102, 104, 106],
+            "fn": lambda: recorder.disarm_recording(force_feedback=True)
         }], recorder)
 
         midi_in.set_callback(MidiInCallback(keyboard))
