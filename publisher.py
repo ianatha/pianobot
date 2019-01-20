@@ -12,8 +12,20 @@ from midi2audio import FluidSynth
 from slackclient import SlackClient
 import json
 
-GOOGLE_SCOPES = ['https://www.googleapis.com/auth/drive']
+from functools import wraps
 
+
+def queued(f):
+     @wraps(f)
+     def wrapper(*args, **kwds):
+         self = args[0]
+         self._queue.put([f.__name__, list(args[1:]), kwds])
+         return
+     wrapper.underlying_method = f
+     return wrapper
+
+
+GOOGLE_SCOPES = ['https://www.googleapis.com/auth/drive']
 
 class Publisher(Thread):
     def __init__(self, soundfont_path, slack_api_token, slack_channel_public, slack_channel_private, google_credentials_json_str, google_folder_id):
@@ -36,29 +48,20 @@ class Publisher(Thread):
         while True:
             item = self._queue.get()
             if item is None:
+                self._queue.task_done()
                 break
-            if item[0] == 'slack_text':
-                self._slack_text(item[1])
-                pass
-            elif item[0] == 'publish_midi_file':
-                self._publish_midi_file(item[1], item[2], item[3])
-            elif item[1] == 'publish_raw_data':
-                self._publish_raw_data(item[1], item[2])
             else:
-                print(item)
-                print("bad queued event. abort")
-            self._queue.task_done()
+                f = getattr(self, item[0])
+                f.underlying_method(self, *item[1], **item[2])
+                self._queue.task_done()
+                return
 
+    @queued
     def publish_raw_data(self, file_prefix, data):
-        self._queue.put(["publish_raw_data", file_prefix, data])
-
-    def _publish_raw_data(self, file_prefix, data):
         self._google_upload(file_prefix + ".json", "application/json", json.dumps(data))
 
+    @queued
     def publish_midi_file(self, file_prefix, midi_bytes, public):
-        self._queue.put(["publish_midi_file", file_prefix, midi_bytes, public])
-
-    def _publish_midi_file(self, file_prefix, midi_bytes, public):
         with NamedTemporaryFile("wb", prefix=file_prefix + "-", suffix='.mid') as midi_output:
             midi_output.write(midi_bytes)
             midi_output.flush()
@@ -80,17 +83,16 @@ class Publisher(Thread):
                     self._slack_upload_public(file_prefix + ".wav", wav_bytes)
             os.remove(wav_output_name)
 
+    @queued
     def slack_text(self, text):
-        self._queue.put(["slack_text", text])
-
-    def _slack_text(self, text):
         res = self._slack_client.api_call(
             "chat.postMessage",
             channel=self._slack_channel_public,
             text=text
         )
 
-    def _google_upload(self, name, mime, data):
+    @queued
+    def google_upload(self, name, mime, data):
         file_metadata = {
             'title': name,
             'parents': [{'id': self._google_folder_id}]
@@ -104,7 +106,8 @@ class Publisher(Thread):
                                                         fields='id').execute()
         return file_insert.get('id')
 
-    def _slack_upload_public(self, name, data):
+    @queued
+    def slack_upload_public(self, name, data):
         res = self._slack_client.api_call(
             "files.upload",
             channels=self._slack_channel_public,
@@ -112,7 +115,8 @@ class Publisher(Thread):
             title=name
         )
 
-    def _slack_upload_private(self, name, data):
+    @queued
+    def slack_upload_private(self, name, data):
         res = self._slack_client.api_call(
             "files.upload",
             channels=self._slack_channel_private,

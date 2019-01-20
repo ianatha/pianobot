@@ -22,6 +22,7 @@ class Pianobot(object):
             sys.exit()
 
         musical_feedback = MusicalFeedback(midi_out)
+        musical_feedback.start()
         recorder = Recorder(musical_feedback, self._publisher)
         recorder.start()
 
@@ -43,6 +44,7 @@ class Pianobot(object):
             print('Exiting due to Ctrl-C.')
         finally:
             print("Shutting down...")
+            musical_feedback.shutdown()
             recorder.shutdown()
             keyboard.shutdown()
             midi_in.close_port()

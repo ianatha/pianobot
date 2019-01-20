@@ -5,6 +5,7 @@ from threading import Thread
 
 from mido import MidiFile, MidiTrack, Message, second2tick, bpm2tempo
 
+from publisher import queued
 from resettable_timer import ResettableTimer
 
 DEFAULT_BPM = 120
@@ -33,18 +34,15 @@ class Recorder(Thread):
         while True:
             item = self._queue.get()
             if item is None:
+                self._queue.task_done()
                 break
-            type = item[0]
-            if type == "midi":
-                self._record_midi_event(item[1], item[2], item[3], item[4], item[5])
-            elif type == "raw":
-                self._record_raw_event(item[1], item[2], item[3], item[4])
-            elif type == "disarm_recording":
-                self._disarm_recording()
             else:
-                print("unknown type")
-            self._queue.task_done()
+                f = getattr(self, item[0])
+                f.underlying_method(self, *item[1], **item[2])
+                self._queue.task_done()
+                return
 
+    @queued
     def arm_public(self):
         self.arm_recording()
         self._armed_public = True
@@ -52,16 +50,15 @@ class Recorder(Thread):
         # self._publisher.slack_text("_the next session will be publicized_")
         pass
 
+    @queued
     def arm_recording(self):
         if self._armed:
             return
         self._armed = True
         self._publisher.slack_text("_will record for research purposes only when someone plays_")
 
+    @queued
     def disarm_recording(self):
-        self._queue.put("disarm_recording")
-
-    def _disarm_recording(self):
         if not self._armed:
             self._feedback.sad_sound()
             return
@@ -72,6 +69,7 @@ class Recorder(Thread):
         self._rearm_timeout = ResettableTimer(RECORDING_REARM_TIMEOUT, self.arm_recording)
         self._rearm_timeout.start()
 
+    @queued
     def stop_recording(self):
         if not self._recording:
             return
@@ -108,10 +106,8 @@ class Recorder(Thread):
         if self._armed_public:
             self._publisher.slack_text("_just started a recording for public consumption_")
 
+    @queued
     def record_raw_event(self, t, message, deltatime, data):
-        self._queue.put(["raw", t, message, deltatime, data])
-
-    def _record_raw_event(self, t, message, deltatime, data):
         if self._rearm_timeout:
             self._rearm_timeout.reset()
         if not self._recording and self._armed:
@@ -120,10 +116,8 @@ class Recorder(Thread):
             self._recording_timeout.reset()
             self._raw_events.append([t, deltatime, message, data])
 
+    @queued
     def record_event(self, event, note, velocity, t, deltatime):
-        self._queue.put(["midi", event, note, velocity, t, deltatime])
-
-    def _record_midi_event(self, event, note, velocity, t, deltatime):
         if self._rearm_timeout:
             self._rearm_timeout.reset()
         if not self._recording and self._armed:
