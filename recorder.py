@@ -26,6 +26,7 @@ class Recorder(Thread):
         self._recording_timeout = None
         self._rearm_timeout = None
         self._last_recorded_event = None
+        self._raw_events = []
         self._queue = Queue()
 
     def run(self):
@@ -33,8 +34,13 @@ class Recorder(Thread):
             item = self._queue.get()
             if item is None:
                 break
-            event, note, velocity, t, deltatime = item
-            self._record_event(event, note, velocity, t, deltatime)
+            type = item[0]
+            if type == "midi":
+                self._record_midi_event(item[1], item[2], item[3], item[4], item[5])
+            elif type == "raw":
+                self._record_raw_event(item[1], item[2])
+            else:
+                print("unknown type")
             self._queue.task_done()
 
     def arm_public(self):
@@ -76,6 +82,7 @@ class Recorder(Thread):
         midi_bytes = BytesIO()
         self._midifile.save(file=midi_bytes)
         self._publisher.publish_midi_file(file_prefix, midi_bytes.getbuffer(), public=self._armed_public)
+        self._publisher.publish_raw_data(file_prefix, self._raw_events)
         del midi_bytes
         self._armed_public = False
         self._midifile = None
@@ -92,13 +99,26 @@ class Recorder(Thread):
         self._recording_timeout = ResettableTimer(RECORDING_END_TIMEOUT, self.stop_recording)
         self._recording_timeout.start()
         self._last_recorded_event = None
+        self._raw_events = []
         if self._armed_public:
             self._publisher.slack_text("_just started a recording for public consumption_")
 
-    def record_event(self, event, note, velocity, t, deltatime):
-        self._queue.put([event, note, velocity, t, deltatime])
+    def record_raw_event(self, t, message, deltatime, data):
+        self._queue.put(["raw", t, message, deltatime, data])
 
-    def _record_event(self, event, note, velocity, t, deltatime):
+    def _record_raw_event(self, t, message, deltatime, data):
+        if self._rearm_timeout:
+            self._rearm_timeout.reset()
+        if not self._recording and self._armed:
+            self.start_recording(t)
+        if self._recording:
+            self._recording_timeout.reset()
+            self._raw_events.append([t, deltatime, message, data])
+
+    def record_event(self, event, note, velocity, t, deltatime):
+        self._queue.put(["midi", event, note, velocity, t, deltatime])
+
+    def _record_midi_event(self, event, note, velocity, t, deltatime):
         if self._rearm_timeout:
             self._rearm_timeout.reset()
         if not self._recording and self._armed:

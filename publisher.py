@@ -10,6 +10,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from midi2audio import FluidSynth
 from slackclient import SlackClient
+import json
 
 GOOGLE_SCOPES = ['https://www.googleapis.com/auth/drive']
 SOUNDFONT_PATH = os.environ["SOUNDFONT_PATH"]
@@ -41,10 +42,18 @@ class Publisher(Thread):
                 pass
             elif item[0] == 'publish_midi_file':
                 self._publish_midi_file(item[1], item[2], item[3])
+            elif item[1] == 'publish_raw_data':
+                self._publish_raw_data(item[1], item[2])
             else:
                 print(item)
                 print("bad queued event. abort")
             self._queue.task_done()
+
+    def publish_raw_data(self, file_prefix, data):
+        self._queue.put(["publish_raw_data", file_prefix, data])
+
+    def _publish_raw_data(self, file_prefix, data):
+        self._google_upload(file_prefix + ".json", "application/json", json.dumps(data))
 
     def publish_midi_file(self, file_prefix, midi_bytes, public):
         self._queue.put(["publish_midi_file", file_prefix, midi_bytes, public])

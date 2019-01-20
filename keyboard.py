@@ -31,6 +31,9 @@ class Keyboard(object):
         t = self._wallclock
         event_type = message[0]
 
+        if event_type != ACTIVE_SENSING:
+            self._recorder.record_raw_event(t, message, deltatime, data)
+
         if event_type == NOTE_ON:
             note = message[1]
             velocity = message[2]
