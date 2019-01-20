@@ -41,9 +41,9 @@ class Keyboard(object):
         elif event_type == NOTE_OFF:
             note = message[1]
             velocity = message[2]
-            self.note_on(t, message[1], message[2], deltatime)
-        elif event_type == CONTROL_CHANGE:
-            self.control_change(t, message[1], message[2], deltatime)
+            self.note_off(t, message[1], message[2], deltatime)
+        # elif event_type == CONTROL_CHANGE:
+        #     self.control_change(t, message[1], message[2], deltatime)
         elif event_type == ACTIVE_SENSING:
             self._no_midi_timeout.reset()
             pass
@@ -56,7 +56,6 @@ class Keyboard(object):
 
     def connection_timeout(self):
         self._timedout = True
-        print("connection timed out. is the piano still alive?")
 
     def is_note_active(self, note):
         return self._active_notes[note] is not None and self._active_notes_velocity[note] is not None

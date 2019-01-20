@@ -38,7 +38,9 @@ class Recorder(Thread):
             if type == "midi":
                 self._record_midi_event(item[1], item[2], item[3], item[4], item[5])
             elif type == "raw":
-                self._record_raw_event(item[1], item[2])
+                self._record_raw_event(item[1], item[2], item[3], item[4])
+            elif type == "disarm_recording":
+                self._disarm_recording()
             else:
                 print("unknown type")
             self._queue.task_done()
@@ -57,6 +59,9 @@ class Recorder(Thread):
         self._publisher.slack_text("_will record for research purposes only when someone plays_")
 
     def disarm_recording(self):
+        self._queue.put("disarm_recording")
+
+    def _disarm_recording(self):
         if not self._armed:
             self._feedback.sad_sound()
             return
