@@ -1,36 +1,11 @@
 import sys
 import time
 
-from rtmidi.midiconstants import NOTE_ON, NOTE_OFF
 from rtmidi.midiutil import open_midiinput, open_midioutput
 
 from keyboard import Keyboard
 from musical_feedback import MusicalFeedback
 from recorder import Recorder
-
-
-class MidiInCallback(object):
-    def __init__(self, keyboard):
-        self._wallclock = time.time()
-        self._keyboard = keyboard
-
-    def __call__(self, event, data=None):
-        message, deltatime = event
-        self._wallclock += deltatime
-
-        t = self._wallclock
-        event_type = message[0]
-
-        if event_type == NOTE_ON:
-            note = message[1]
-            velocity = message[2]
-            self._keyboard.note_on(t, note, velocity, deltatime)
-        elif event_type == NOTE_OFF:
-            note = message[1]
-            velocity = message[2]
-            self._keyboard.note_off(t, note, velocity, deltatime)
-        else:
-            print("Unrecognized message: %s" % message)
 
 
 class Pianobot(object):
@@ -49,7 +24,7 @@ class Pianobot(object):
         recorder = Recorder(musical_feedback, self._publisher)
         recorder.start()
 
-        keyboard = Keyboard([{
+        keyboard = Keyboard(midi_in, [{
             "combo": [105, 107, 108],
             "fn": lambda: recorder.arm_public()
         }, {
@@ -57,12 +32,10 @@ class Pianobot(object):
             "fn": lambda: recorder.disarm_recording()
         }], recorder)
 
-        midi_in.set_callback(MidiInCallback(keyboard))
         recorder.arm_recording()
 
-        print("Entering main Pianobot loop. Press Control-C to exit.")
         try:
-            while True:
+            while not keyboard._timedout:
                 time.sleep(1)
         except KeyboardInterrupt:
             print('')
@@ -70,6 +43,7 @@ class Pianobot(object):
             print("Exit.")
             recorder.shutdown()
             self._publisher.shutdown()
+            keyboard.shutdown()
             midi_in.close_port()
             midi_out.close_port()
             del midi_in
