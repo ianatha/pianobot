@@ -1,6 +1,5 @@
 NUMBER_OF_PIANO_KEYS = 120
 
-
 class Keyboard(object):
     def __init__(self, commands, recorder=None):
         self._active_notes = [None] * NUMBER_OF_PIANO_KEYS

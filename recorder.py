@@ -11,24 +11,7 @@ DEFAULT_BPM = 120
 RECORDING_END_TIMEOUT = 15
 RECORDING_REARM_TIMEOUT = 3 * 60
 
-##
-# rightmost sustain pedal
 
-# 19.01.19 19:46:12 (-0800)  main  Unrecognized message: [176, 64, 17]
-# 19.01.19 19:46:12 (-0800)  main  Unrecognized message: [176, 64, 42]
-# 19.01.19 19:46:12 (-0800)  main  Unrecognized message: [176, 64, 75]
-# 19.01.19 19:46:12 (-0800)  main  Unrecognized message: [176, 64, 127]
-# 19.01.19 19:46:12 (-0800)  main  Unrecognized message: [176, 64, 39]
-# 19.01.19 19:46:12 (-0800)  main  Unrecognized message: [176, 64, 0]
-
-# leftmost pedal
-# 19.01.19 19:46:38 (-0800)  main  Unrecognized message: [176, 67, 127]
-# 19.01.19 19:46:38 (-0800)  main  Unrecognized message: [176, 67, 0]
-# 19.01.19 19:46:39 (-0800)  main  Unrecognized message: [176, 67, 127]
-# 19.01.19 19:46:39 (-0800)  main  Unrecognized message: [176, 67, 0]
-#middle pedal
-#19.01.19 19:46:52 (-0800)  main  Unrecognized message: [176, 66, 127]
-#19.01.19 19:46:53 (-0800)  main  Unrecognized message: [176, 66, 0]
 class Recorder(Thread):
     def __init__(self, musical_feedback, publisher):
         Thread.__init__(self)
@@ -125,7 +108,7 @@ class Recorder(Thread):
             if self._last_recorded_event is None:
                 self._last_recorded_event = t
             self._miditrack.append(Message(event, note=note, velocity=velocity, time=int(
-                second2tick(deltatime, self._midifile.ticks_per_beat, bpm2tempo(DEFAULT_BPM)))))
+                second2tick(t - self._last_recorded_event, self._midifile.ticks_per_beat, bpm2tempo(DEFAULT_BPM)))))
             self._last_recorded_event = t
 
     def shutdown(self):
