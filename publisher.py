@@ -13,12 +13,12 @@ from slackclient import SlackClient
 import json
 
 GOOGLE_SCOPES = ['https://www.googleapis.com/auth/drive']
-SOUNDFONT_PATH = os.environ["SOUNDFONT_PATH"]
 
 
 class Publisher(Thread):
-    def __init__(self, slack_api_token, slack_channel_public, slack_channel_private, google_credentials_json_str, google_folder_id):
+    def __init__(self, soundfont_path, slack_api_token, slack_channel_public, slack_channel_private, google_credentials_json_str, google_folder_id):
         Thread.__init__(self)
+        self._soundfont_path = soundfont_path
         self._slack_client = SlackClient(slack_api_token)
         self._slack_channel_public = slack_channel_public
         self._slack_channel_private = slack_channel_private
@@ -69,7 +69,7 @@ class Publisher(Thread):
                 self._slack_upload_public(file_prefix + ".mid", midi_bytes)
 
             wav_output_name = midi_output.name + ".wav"
-            fluidsynth = FluidSynth(SOUNDFONT_PATH)
+            fluidsynth = FluidSynth(self._soundfont_path)
             fluidsynth.midi_to_audio(midi_output.name, wav_output_name)
 
             with open(wav_output_name, "rb") as wav_file_handle:

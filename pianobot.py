@@ -1,7 +1,7 @@
 import sys
 import time
 
-from rtmidi.midiutil import open_midiinput, open_midioutput
+from rtmidi.midiutil import open_midiport
 
 from keyboard import Keyboard
 from musical_feedback import MusicalFeedback
@@ -15,9 +15,10 @@ class Pianobot(object):
 
     def run(self):
         try:
-            midi_in, in_port_name = open_midiinput(self._port_number)
-            midi_out, out_port_name = open_midioutput(self._port_number, 0)
-        except (EOFError, KeyboardInterrupt):
+            midi_in, in_port_name = open_midiport(self._port_number, "input", use_virtual=False, interactive=False)
+            midi_out, out_port_name = open_midiport(self._port_number, "output", use_virtual=False, interactive=False)
+        except (IOError, EOFError, KeyboardInterrupt):
+            print("Unable to open MIDI port %s" % self._port_number)
             sys.exit()
 
         musical_feedback = MusicalFeedback(midi_out)
@@ -37,12 +38,12 @@ class Pianobot(object):
         try:
             while not keyboard._timedout:
                 time.sleep(1)
+            print("Exiting because MIDI device timed out.")
         except KeyboardInterrupt:
-            print('')
+            print('Exiting due to Ctrl-C.')
         finally:
-            print("Exit.")
+            print("Shutting down...")
             recorder.shutdown()
-            self._publisher.shutdown()
             keyboard.shutdown()
             midi_in.close_port()
             midi_out.close_port()
