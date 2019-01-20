@@ -1,32 +1,53 @@
+import logging
 import sys
 import time
 
+import rtmidi
 from rtmidi.midiutil import open_midiport
 
 from keyboard import Keyboard
 from musical_feedback import MusicalFeedback
 from recorder import Recorder
 
+log = logging.getLogger('pianobot')
 
 class Pianobot(object):
-    def __init__(self, port_number, publisher):
-        self._port_number = port_number
+    def __init__(self, port_name, publisher):
+        self._port_name = port_name
         self._publisher = publisher
+        self._midi_in = None
+        self._midi_out = None
+
+    def _open_midi(self):
+        try:
+            port_names = rtmidi.MidiIn().get_ports()
+            port_number = port_names.index(self._port_name)
+        except (ValueError, IOError) as e:
+            log.debug("_open_midi, port_names=%s, e=%s", port_names, e)
+            return False
+        try:
+            if self._midi_in is None:
+                self._midi_in, _ = open_midiport(port_number, "input", use_virtual=False, interactive=False)
+            if self._midi_out is None:
+                self._midi_out, _ = open_midiport(port_number, "output", use_virtual=False, interactive=False)
+        except IOError as e:
+            log.debug("_open_midi, port_number=%s, in=%s, out=%s, IOError=%s", self._port_number, self._midi_in is not None, self._midi_out is not None, e)
+            return False
+        return True
 
     def run(self):
-        try:
-            midi_in, in_port_name = open_midiport(self._port_number, "input", use_virtual=False, interactive=False)
-            midi_out, out_port_name = open_midiport(self._port_number, "output", use_virtual=False, interactive=False)
-        except (IOError, EOFError, KeyboardInterrupt):
-            print("Unable to open MIDI port %s" % self._port_number)
-            sys.exit()
+        log.info("Trying to connect to %s", self._port_name)
+        while not self._open_midi():
+            time.sleep(2)
+        log.info("Connected to %s", self._port_name)
 
-        musical_feedback = MusicalFeedback(midi_out)
+        musical_feedback = MusicalFeedback(self._midi_out)
         musical_feedback.start()
+
         recorder = Recorder(musical_feedback, self._publisher)
         recorder.start()
 
-        keyboard = Keyboard(midi_in, [{
+        keyboard = Keyboard(self._midi_in, [{
             "combo": [105, 107, 108],
             "fn": lambda: recorder.arm_public()
         }, {
@@ -47,7 +68,7 @@ class Pianobot(object):
             musical_feedback.shutdown()
             recorder.shutdown()
             keyboard.shutdown()
-            midi_in.close_port()
-            midi_out.close_port()
-            del midi_in
-            del midi_out
+            self._midi_in.close_port()
+            self._midi_out.close_port()
+            self._midi_in = None
+            self._midi_out = None

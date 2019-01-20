@@ -1,3 +1,4 @@
+import logging
 import time
 from io import BytesIO
 from queue import Queue
@@ -33,6 +34,7 @@ class Recorder(Thread):
     def run(self):
         while True:
             item = self._queue.get()
+            logging.debug("recorder dequeued %s", item)
             if item is None:
                 self._queue.task_done()
                 break
@@ -40,34 +42,38 @@ class Recorder(Thread):
                 f = getattr(self, item[0])
                 f.underlying_method(self, *item[1], **item[2])
                 self._queue.task_done()
-                return
 
     @queued
     def arm_public(self):
         self.arm_recording()
         self._armed_public = True
         self._feedback.happy_sound()
+        logging.info("recording armed as public")
         # self._publisher.slack_text("_the next session will be publicized_")
         pass
 
     @queued
     def arm_recording(self):
         if self._armed:
+            logging.info("recording already armed")
             return
         self._armed = True
+        logging.info("recording armed")
         self._publisher.slack_text("_will record for research purposes only when someone plays_")
 
     @queued
     def disarm_recording(self):
         if not self._armed:
+            logging.info("recording already disarmed")
             self._feedback.sad_sound()
             return
         self.stop_recording()
-        self._publisher.slack_text("_won't record for now_")
         self._armed = False
+        logging.info("recording disarmed")
         self._feedback.sad_sound()
-        self._rearm_timeout = ResettableTimer(RECORDING_REARM_TIMEOUT, self.arm_recording)
+        self._rearm_timeout = ResettableTimer(RECORDING_REARM_TIMEOUT, self.arm_recording(), name="recording_rearm")
         self._rearm_timeout.start()
+        self._publisher.slack_text("_won't record for now_")
 
     @queued
     def stop_recording(self):
@@ -99,7 +105,7 @@ class Recorder(Thread):
         self._midifile = MidiFile()
         self._miditrack = MidiTrack()
         self._midifile.tracks.append(self._miditrack)
-        self._recording_timeout = ResettableTimer(RECORDING_END_TIMEOUT, self.stop_recording)
+        self._recording_timeout = ResettableTimer(RECORDING_END_TIMEOUT, self.stop_recording, name="recording_idle")
         self._recording_timeout.start()
         self._last_recorded_event = None
         self._raw_events = []

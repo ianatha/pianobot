@@ -54,11 +54,10 @@ class Publisher(Thread):
                 f = getattr(self, item[0])
                 f.underlying_method(self, *item[1], **item[2])
                 self._queue.task_done()
-                return
 
     @queued
     def publish_raw_data(self, file_prefix, data):
-        self._google_upload(file_prefix + ".json", "application/json", json.dumps(data))
+        self.google_upload(file_prefix + ".json", "application/json", json.dumps(data))
 
     @queued
     def publish_midi_file(self, file_prefix, midi_bytes, public):
@@ -66,10 +65,10 @@ class Publisher(Thread):
             midi_output.write(midi_bytes)
             midi_output.flush()
 
-            self._slack_upload_private(file_prefix + ".mid", midi_bytes)
-            self._google_upload(file_prefix + ".mid", "audio/midi", midi_bytes)
+            self.slack_upload_private(file_prefix + ".mid", midi_bytes)
+            self.google_upload(file_prefix + ".mid", "audio/midi", midi_bytes)
             if public:
-                self._slack_upload_public(file_prefix + ".mid", midi_bytes)
+                self.slack_upload_public(file_prefix + ".mid", midi_bytes)
 
             wav_output_name = midi_output.name + ".wav"
             fluidsynth = FluidSynth(self._soundfont_path)
@@ -77,10 +76,10 @@ class Publisher(Thread):
 
             with open(wav_output_name, "rb") as wav_file_handle:
                 wav_bytes = wav_file_handle.read()
-                self._slack_upload_private(file_prefix + ".wav", wav_bytes)
-                self._google_upload(file_prefix + ".wav", "audio/wav", wav_bytes)
+                self.slack_upload_private(file_prefix + ".wav", wav_bytes)
+                self.google_upload(file_prefix + ".wav", "audio/wav", wav_bytes)
                 if public:
-                    self._slack_upload_public(file_prefix + ".wav", wav_bytes)
+                    self.slack_upload_public(file_prefix + ".wav", wav_bytes)
             os.remove(wav_output_name)
 
     @queued

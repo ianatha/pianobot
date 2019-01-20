@@ -1,3 +1,4 @@
+import logging
 import time
 
 from rtmidi.midiconstants import NOTE_ON, NOTE_OFF, ACTIVE_SENSING, CONTROL_CHANGE
@@ -5,6 +6,9 @@ from rtmidi.midiconstants import NOTE_ON, NOTE_OFF, ACTIVE_SENSING, CONTROL_CHAN
 from resettable_timer import ResettableTimer
 
 NUMBER_OF_PIANO_KEYS = 120
+ACTIVE_SENSE_TIMEOUT = 3
+
+log = logging.getLogger('pianobot')
 
 class Keyboard(object):
     def __init__(self, midi_in, commands=[], recorder=None):
@@ -19,9 +23,8 @@ class Keyboard(object):
         self._midi_in.ignore_types(sysex=False, timing=False, active_sense=False)
         self._wallclock = time.time()
         self._midi_in.set_callback(self)
-        self._no_midi_timeout = ResettableTimer(3, self.connection_timeout)
-        self._no_midi_timeout.start()
         self._timedout = False
+        self._no_midi_timeout = None
 
     # Called as a callback by rtmidi
     def __call__(self, event, data=None):
@@ -30,6 +33,7 @@ class Keyboard(object):
 
         t = self._wallclock
         event_type = message[0]
+        log.debug("rtmidi message received: @%s: %s, delta=%f, data=%s", t, message, deltatime, data)
 
         if event_type != ACTIVE_SENSING:
             self._recorder.record_raw_event(t, message, deltatime, data)
@@ -45,10 +49,17 @@ class Keyboard(object):
         # elif event_type == CONTROL_CHANGE:
         #     self.control_change(t, message[1], message[2], deltatime)
         elif event_type == ACTIVE_SENSING:
-            self._no_midi_timeout.reset()
-            pass
+            self._on_active_sense()
         else:
             print("Unrecognized message: %s" % message)
+
+    def _on_active_sense(self):
+        if self._no_midi_timeout is None:
+            log.debug("received ACTIVE_SENSE - expecting to receive one every %d seconds", ACTIVE_SENSE_TIMEOUT)
+            self._no_midi_timeout = ResettableTimer(ACTIVE_SENSE_TIMEOUT, self.connection_timeout, "active_sense")
+            self._no_midi_timeout.start()
+        else:
+            self._no_midi_timeout.reset()
 
     def shutdown(self):
         self._no_midi_timeout.cancel()

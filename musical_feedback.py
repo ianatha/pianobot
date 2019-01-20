@@ -23,7 +23,6 @@ class MusicalFeedback(Thread):
                 f = getattr(self, item[0])
                 f.underlying_method(self, *item[1], **item[2])
                 self._queue.task_done()
-                return
 
     def shutdown(self):
         self._queue.put(None)

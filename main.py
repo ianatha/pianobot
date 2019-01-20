@@ -10,7 +10,7 @@ from slackclient import SlackClient
 from pianobot import Pianobot
 from publisher import Publisher
 
-PORT_NUMBER = os.environ["MIDI_PORT_NUMBER"]
+MIDI_PORT_NAME = os.environ["MIDI_PORT_NAME"]
 SLACK_CHANNEL_PUBLIC = os.environ["SLACK_CHANNEL_PUBLIC"]
 SLACK_CHANNEL_PRIVATE = os.environ["SLACK_CHANNEL_PRIVATE"]
 SLACK_API_TOKEN = os.environ["SLACK_API_TOKEN"]
@@ -19,6 +19,11 @@ GOOGLE_FOLDER_ID = os.environ["GOOGLE_FOLDER_ID"]
 SOUNDFONT_PATH = os.environ["SOUNDFONT_PATH"]
 
 slack_client = SlackClient(SLACK_API_TOKEN)
+
+if os.environ.get("DEBUG", False):
+    logging.basicConfig(level=logging.DEBUG)
+else:
+    logging.basicConfig(level=logging.INFO)
 
 if __name__ == "__main__":
     try:
@@ -33,7 +38,7 @@ if __name__ == "__main__":
         publisher.start()
 
         pianobot = Pianobot(
-            port_number=PORT_NUMBER,
+            port_name=MIDI_PORT_NAME,
             publisher=publisher
         )
         pianobot.run()
