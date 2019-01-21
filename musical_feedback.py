@@ -1,6 +1,7 @@
 import time
 from queue import Queue
 from threading import Thread
+from typing import List
 
 from rtmidi.midiconstants import NOTE_ON, NOTE_OFF
 
@@ -27,14 +28,14 @@ class MusicalFeedback(Thread):
     def shutdown(self):
         self._queue.put(None)
 
-    def _chord(self, notes, duration_in_secs):
+    def _chord(self, notes: List[int], duration_in_secs: float):
         for note in notes:
             self._out.send_message([NOTE_ON, note, 112])
         time.sleep(duration_in_secs)
         for note in notes:
             self._out.send_message([NOTE_OFF, note, 0])
 
-    def _play_notes(self, notes, duration_in_secs, velocity):
+    def _play_notes(self, notes: List[int], duration_in_secs: float, velocity: int):
         for note in notes:
             self._out.send_message([NOTE_ON, note, velocity])
             time.sleep(duration_in_secs)

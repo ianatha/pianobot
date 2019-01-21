@@ -5,8 +5,8 @@ from rtmidi.midiconstants import NOTE_ON, NOTE_OFF, ACTIVE_SENSING, CONTROL_CHAN
 
 from resettable_timer import ResettableTimer
 
-NUMBER_OF_PIANO_KEYS = 120
-ACTIVE_SENSE_TIMEOUT = 3
+NUMBER_OF_PIANO_KEYS: int = 120
+ACTIVE_SENSE_TIMEOUT: int = 3
 
 log = logging.getLogger('pianobot')
 

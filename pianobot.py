@@ -7,12 +7,14 @@ from rtmidi.midiutil import open_midiport
 
 from keyboard import Keyboard
 from musical_feedback import MusicalFeedback
+from publisher import Publisher
 from recorder import Recorder
 
 log = logging.getLogger('pianobot')
 
+
 class Pianobot(object):
-    def __init__(self, port_name, publisher):
+    def __init__(self, port_name: str, publisher: Publisher):
         self._port_name = port_name
         self._publisher = publisher
         self._midi_in = None

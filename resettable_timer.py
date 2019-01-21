@@ -1,13 +1,15 @@
 import logging
 from threading import Thread, Event
 
+from typing import Optional
+
 
 def ResettableTimer(*args, **kwargs):
     return _ResettableTimer(*args, **kwargs)
 
 
 class _ResettableTimer(Thread):
-    def __init__(self, interval, fn, name="", args=[], kwargs={}):
+    def __init__(self, interval: float, fn, name: str="", args=[], kwargs={}):
         Thread.__init__(self)
         self._interval = interval
         self._fn = fn
@@ -31,7 +33,7 @@ class _ResettableTimer(Thread):
             self._fn(*self._args, **self._kwargs)
         self._finished.set()
 
-    def reset(self, interval=None):
+    def reset(self, interval: Optional[float]=None):
         logging.debug("timer %s reset", self._name)
         if interval:
             self._interval = interval

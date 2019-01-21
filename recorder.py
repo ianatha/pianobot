@@ -6,7 +6,8 @@ from threading import Thread
 
 from mido import MidiFile, MidiTrack, Message, second2tick, bpm2tempo
 
-from publisher import queued
+from musical_feedback import MusicalFeedback
+from publisher import queued, Publisher
 from resettable_timer import ResettableTimer
 
 DEFAULT_BPM = 120
@@ -15,7 +16,7 @@ RECORDING_REARM_TIMEOUT = 3 * 60
 
 
 class Recorder(Thread):
-    def __init__(self, musical_feedback, publisher):
+    def __init__(self, musical_feedback: MusicalFeedback, publisher: Publisher):
         Thread.__init__(self)
         self._armed = False
         self._armed_public = False

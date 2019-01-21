@@ -32,7 +32,7 @@ if __name__ == "__main__":
             slack_api_token=SLACK_API_TOKEN,
             slack_channel_public=SLACK_CHANNEL_PUBLIC,
             slack_channel_private=SLACK_CHANNEL_PRIVATE,
-            google_credentials_json_str=GOOGLE_CREDENTIALS_JSON_STRING,
+            google_credentials_json=GOOGLE_CREDENTIALS_JSON_STRING,
             google_folder_id=GOOGLE_FOLDER_ID
         )
         publisher.start()

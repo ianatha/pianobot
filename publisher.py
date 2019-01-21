@@ -16,25 +16,28 @@ from functools import wraps
 
 
 def queued(f):
-     @wraps(f)
-     def wrapper(*args, **kwds):
-         self = args[0]
-         self._queue.put([f.__name__, list(args[1:]), kwds])
-         return
-     wrapper.underlying_method = f
-     return wrapper
+    @wraps(f)
+    def wrapper(*args, **kwds):
+        self = args[0]
+        self._queue.put([f.__name__, list(args[1:]), kwds])
+        return
+
+    wrapper.underlying_method = f
+    return wrapper
 
 
 GOOGLE_SCOPES = ['https://www.googleapis.com/auth/drive']
 
+
 class Publisher(Thread):
-    def __init__(self, soundfont_path, slack_api_token, slack_channel_public, slack_channel_private, google_credentials_json_str, google_folder_id):
+    def __init__(self, soundfont_path: str, slack_api_token: str, slack_channel_public: str, slack_channel_private: str,
+                 google_credentials_json: str, google_folder_id: str):
         Thread.__init__(self)
         self._soundfont_path = soundfont_path
         self._slack_client = SlackClient(slack_api_token)
         self._slack_channel_public = slack_channel_public
         self._slack_channel_private = slack_channel_private
-        service_credentials = service_account.Credentials.from_service_account_info(google_credentials_json_str,
+        service_credentials = service_account.Credentials.from_service_account_info(google_credentials_json,
                                                                                     scopes=GOOGLE_SCOPES)
         self._google_drive = build('drive', 'v2', credentials=service_credentials, cache_discovery=False)
         self._google_folder_id = google_folder_id
@@ -56,11 +59,11 @@ class Publisher(Thread):
                 self._queue.task_done()
 
     @queued
-    def publish_raw_data(self, file_prefix, data):
+    def publish_raw_data(self, file_prefix: str, data):
         self.google_upload(file_prefix + ".json", "application/json", json.dumps(data))
 
     @queued
-    def publish_midi_file(self, file_prefix, midi_bytes, public):
+    def publish_midi_file(self, file_prefix: str, midi_bytes, public: bool):
         with NamedTemporaryFile("wb", prefix=file_prefix + "-", suffix='.mid') as midi_output:
             midi_output.write(midi_bytes)
             midi_output.flush()
@@ -83,7 +86,7 @@ class Publisher(Thread):
             os.remove(wav_output_name)
 
     @queued
-    def slack_text(self, text):
+    def slack_text(self, text: str):
         res = self._slack_client.api_call(
             "chat.postMessage",
             channel=self._slack_channel_public,
@@ -91,7 +94,7 @@ class Publisher(Thread):
         )
 
     @queued
-    def google_upload(self, name, mime, data):
+    def google_upload(self, name: str, mime: str, data):
         file_metadata = {
             'title': name,
             'parents': [{'id': self._google_folder_id}]
@@ -106,7 +109,7 @@ class Publisher(Thread):
         return file_insert.get('id')
 
     @queued
-    def slack_upload_public(self, name, data):
+    def slack_upload_public(self, name: str, data):
         res = self._slack_client.api_call(
             "files.upload",
             channels=self._slack_channel_public,
@@ -115,7 +118,7 @@ class Publisher(Thread):
         )
 
     @queued
-    def slack_upload_private(self, name, data):
+    def slack_upload_private(self, name: str, data):
         res = self._slack_client.api_call(
             "files.upload",
             channels=self._slack_channel_private,
