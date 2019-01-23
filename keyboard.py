@@ -104,7 +104,7 @@ class Keyboard(object):
 
         if self._active_hotkey[note]:
             self._active_hotkey[note] = False
-        else:
-            duration = t - start_time
-            # if self._recorder:
-            #     self._recorder.record_note(note, velocity, duration, start_time)
+        # else:
+        #     duration = t - start_time
+        # if self._recorder:
+        #     self._recorder.record_note(note, velocity, duration, start_time)
