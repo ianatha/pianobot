@@ -11,7 +11,7 @@ from publisher import queued, Publisher
 from resettable_timer import ResettableTimer
 
 DEFAULT_BPM = 120
-RECORDING_END_TIMEOUT = 15
+RECORDING_END_TIMEOUT = 10
 RECORDING_REARM_TIMEOUT = 3 * 60
 
 log = logging.getLogger('pianobot')
