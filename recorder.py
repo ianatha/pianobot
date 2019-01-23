@@ -14,6 +14,8 @@ DEFAULT_BPM = 120
 RECORDING_END_TIMEOUT = 15
 RECORDING_REARM_TIMEOUT = 3 * 60
 
+log = logging.getLogger('pianobot')
+
 
 class Recorder(Thread):
     def __init__(self, musical_feedback: MusicalFeedback, publisher: Publisher):
@@ -133,8 +135,15 @@ class Recorder(Thread):
             self._recording_timeout.reset()
             if self._last_recorded_event is None:
                 self._last_recorded_event = t
-            self._miditrack.append(Message(event, note=note, velocity=velocity, time=int(
-                second2tick(t - self._last_recorded_event, self._midifile.ticks_per_beat, bpm2tempo(DEFAULT_BPM)))))
+            if event == "note_on" or event == "note_off":
+                self._miditrack.append(Message(event, note=note, velocity=velocity, time=int(
+                    second2tick(t - self._last_recorded_event, self._midifile.ticks_per_beat, bpm2tempo(DEFAULT_BPM)))))
+            elif event == "control_change":
+                self._miditrack.append(Message(event, control=note, value=velocity, time=int(
+                    second2tick(t - self._last_recorded_event, self._midifile.ticks_per_beat, bpm2tempo(DEFAULT_BPM)))))
+            else:
+                log.error("record_event: unknown event type %s", event)
+                return
             self._last_recorded_event = t
 
     def shutdown(self):

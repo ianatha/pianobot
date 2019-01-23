@@ -39,15 +39,11 @@ class Keyboard(object):
             self._recorder.record_raw_event(t, message, deltatime, data)
 
         if event_type == NOTE_ON:
-            note = message[1]
-            velocity = message[2]
             self.note_on(t, message[1], message[2], deltatime)
         elif event_type == NOTE_OFF:
-            note = message[1]
-            velocity = message[2]
             self.note_off(t, message[1], message[2], deltatime)
-        # elif event_type == CONTROL_CHANGE:
-        #     self.control_change(t, message[1], message[2], deltatime)
+        elif event_type == CONTROL_CHANGE:
+            self.control_change(t, message[1], message[2], deltatime)
         elif event_type == ACTIVE_SENSING:
             self._on_active_sense()
         else:
@@ -82,8 +78,9 @@ class Keyboard(object):
                     fn()
                     break
 
-    def control_change(self):
-        pass
+    def control_change(self, t, note, velocity, deltatime):
+        if self._recorder:
+            self._recorder.record_event("control_change", note, velocity, t, deltatime)
 
     def note_on(self, t, note, velocity, deltatime):
         self._active_notes[note] = t
