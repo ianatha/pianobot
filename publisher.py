@@ -95,18 +95,19 @@ class Publisher(Thread):
 
     @queued
     def google_upload(self, name, mime, data):
-        file_metadata = {
-            'title': name,
-            'parents': [{'id': self._google_folder_id}]
-        }
-        bytes_to_upload = BytesIO(data)
-        media = MediaIoBaseUpload(bytes_to_upload,
-                                  mimetype=mime,
-                                  resumable=True)
-        file_insert = self._google_drive.files().insert(body=file_metadata,
-                                                        media_body=media,
-                                                        fields='id').execute()
-        return file_insert.get('id')
+        pass
+        # file_metadata = {
+        #     'title': name,
+        #     'parents': [{'id': self._google_folder_id}]
+        # }
+        # bytes_to_upload = BytesIO(data)
+        # media = MediaIoBaseUpload(bytes_to_upload,
+        #                           mimetype=mime,
+        #                           resumable=True)
+        # file_insert = self._google_drive.files().insert(body=file_metadata,
+        #                                                 media_body=media,
+        #                                                 fields='id').execute()
+        # return file_insert.get('id')
 
     @queued
     def slack_upload_public(self, name: str, data):
