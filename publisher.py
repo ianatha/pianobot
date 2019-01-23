@@ -126,3 +126,4 @@ class Publisher(Thread):
             file=data,
             title=name
         )
+        print(res)

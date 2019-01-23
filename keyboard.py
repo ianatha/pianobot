@@ -92,7 +92,7 @@ class Keyboard(object):
 
     def note_off(self, t, note, velocity, deltatime):
         if not self.is_note_active(note):
-            print("guard fail")
+            print("guard fail: %s note wasn't active when note off" % note)
 
         if self._recorder:
             self._recorder.record_event("note_off", note, velocity, t, deltatime)
