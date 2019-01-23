@@ -94,7 +94,7 @@ class Publisher(Thread):
         )
 
     @queued
-    def google_upload(self, name: str, mime: str, data):
+    def google_upload(self, name, mime, data):
         file_metadata = {
             'title': name,
             'parents': [{'id': self._google_folder_id}]
