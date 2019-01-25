@@ -5,11 +5,11 @@ from tempfile import NamedTemporaryFile
 import os
 from threading import Thread
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
-from midi2audio import FluidSynth
-from slackclient import SlackClient
+from google.oauth2 import service_account  # type: ignore
+from googleapiclient.discovery import build  # type: ignore
+from googleapiclient.http import MediaIoBaseUpload  # type: ignore
+from midi2audio import FluidSynth  # type: ignore
+from slackclient import SlackClient  # type: ignore
 import json
 
 from functools import wraps
@@ -42,12 +42,12 @@ class Publisher(Thread):
         self._google_drive = build('drive', 'v2', credentials=service_credentials, cache_discovery=False)
         self._google_folder_id = google_folder_id
 
-        self._queue = Queue()
+        self._queue: Queue = Queue()
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         self._queue.put(None)
 
-    def run(self):
+    def run(self) -> None:
         while True:
             item = self._queue.get()
             if item is None:
@@ -59,11 +59,11 @@ class Publisher(Thread):
                 self._queue.task_done()
 
     @queued
-    def publish_raw_data(self, file_prefix: str, data):
+    def publish_raw_data(self, file_prefix: str, data) -> None:
         self.google_upload(file_prefix + ".json", "application/json", json.dumps(data))
 
     @queued
-    def publish_midi_file(self, file_prefix: str, midi_bytes, public: bool):
+    def publish_midi_file(self, file_prefix: str, midi_bytes, public: bool) -> None:
         with NamedTemporaryFile("wb", prefix=file_prefix + "-", suffix='.mid') as midi_output:
             midi_output.write(midi_bytes)
             midi_output.flush()
@@ -86,7 +86,7 @@ class Publisher(Thread):
             os.remove(wav_output_name)
 
     @queued
-    def slack_text(self, text: str):
+    def slack_text(self, text: str) -> None:
         res = self._slack_client.api_call(
             "chat.postMessage",
             channel=self._slack_channel_public,
@@ -94,23 +94,22 @@ class Publisher(Thread):
         )
 
     @queued
-    def google_upload(self, name, mime, data):
-        pass
-        # file_metadata = {
-        #     'title': name,
-        #     'parents': [{'id': self._google_folder_id}]
-        # }
-        # bytes_to_upload = BytesIO(data)
-        # media = MediaIoBaseUpload(bytes_to_upload,
-        #                           mimetype=mime,
-        #                           resumable=True)
-        # file_insert = self._google_drive.files().insert(body=file_metadata,
-        #                                                 media_body=media,
-        #                                                 fields='id').execute()
-        # return file_insert.get('id')
+    def google_upload(self, name: str, mime: str, data) -> str:
+        file_metadata = {
+            'title': name,
+            'parents': [{'id': self._google_folder_id}]
+        }
+        bytes_to_upload = BytesIO(data)
+        media = MediaIoBaseUpload(bytes_to_upload,
+                                  mimetype=mime,
+                                  resumable=False)
+        file_insert = self._google_drive.files().insert(body=file_metadata,
+                                                        media_body=media,
+                                                        fields='id').execute()
+        return file_insert.get('id')
 
     @queued
-    def slack_upload_public(self, name: str, data):
+    def slack_upload_public(self, name: str, data) -> None:
         res = self._slack_client.api_call(
             "files.upload",
             channels=self._slack_channel_public,
@@ -119,11 +118,10 @@ class Publisher(Thread):
         )
 
     @queued
-    def slack_upload_private(self, name: str, data):
+    def slack_upload_private(self, name: str, data) -> None:
         res = self._slack_client.api_call(
             "files.upload",
             channels=self._slack_channel_private,
             file=data,
             title=name
         )
-        print(res)

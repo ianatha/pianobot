@@ -3,7 +3,7 @@ from queue import Queue
 from threading import Thread
 from typing import List
 
-from rtmidi.midiconstants import NOTE_ON, NOTE_OFF
+from rtmidi.midiconstants import NOTE_ON, NOTE_OFF  # type: ignore
 
 from publisher import queued
 

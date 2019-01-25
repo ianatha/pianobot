@@ -1,7 +1,7 @@
 import logging
 import time
 
-from rtmidi.midiconstants import NOTE_ON, NOTE_OFF, ACTIVE_SENSING, CONTROL_CHANGE
+from rtmidi.midiconstants import NOTE_ON, NOTE_OFF, ACTIVE_SENSING, CONTROL_CHANGE  # type: ignore
 
 from resettable_timer import ResettableTimer
 

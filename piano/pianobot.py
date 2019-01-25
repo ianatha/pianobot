@@ -1,9 +1,8 @@
 import logging
-import sys
 import time
 
-import rtmidi
-from rtmidi.midiutil import open_midiport
+import rtmidi  # type: ignore
+from rtmidi.midiutil import open_midiport  # type: ignore
 
 from keyboard import Keyboard
 from musical_feedback import MusicalFeedback

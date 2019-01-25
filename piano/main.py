@@ -5,8 +5,6 @@ import logging
 import os
 from base64 import b64decode
 
-from slackclient import SlackClient
-
 from pianobot import Pianobot
 from publisher import Publisher
 
@@ -17,8 +15,6 @@ SLACK_API_TOKEN = os.environ["SLACK_API_TOKEN"]
 GOOGLE_CREDENTIALS_JSON_STRING = json.loads(b64decode(os.environ["GOOGLE_CREDENTIALS_JSON"]))
 GOOGLE_FOLDER_ID = os.environ["GOOGLE_FOLDER_ID"]
 SOUNDFONT_PATH = os.environ["SOUNDFONT_PATH"]
-
-slack_client = SlackClient(SLACK_API_TOKEN)
 
 if os.environ.get("DEBUG", False):
     logging.basicConfig(level=logging.DEBUG)

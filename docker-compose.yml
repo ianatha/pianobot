@@ -1,0 +1,29 @@
+version: '2'
+services:
+  display:
+    build: display
+    privileged: true
+    network_mode: "host"
+    depends_on:
+      - piano
+    tty: true
+    labels:
+      io.balena.features.dbus: '1'
+      io.balena.features.firmware: '1'
+      io.balena.features.kernel-modules: '1'
+    devices:
+      - "/dev/input:/dev/input"
+      - "/dev/vchiq:/dev/vchiq"
+      - "/dev/fb0:/dev/fb0"
+  piano:    
+    build: piano
+    privileged: true    
+    network_mode: "host"
+    environment:
+      TZ: 'America/Los_Angeles'
+    read_only: true
+    tmpfs:
+      - /run
+      - /tmp
+    stdin_open: true
+    tty: true

@@ -3,10 +3,11 @@ import time
 from io import BytesIO
 from queue import Queue
 from threading import Thread
+from typing import List, Any
 
-from mido import MidiFile, MidiTrack, Message, second2tick, bpm2tempo
+from mido import MidiFile, MidiTrack, Message, second2tick, bpm2tempo  # type: ignore
 
-from musical_feedback import MusicalFeedback
+from musical_feedback import MusicalFeedback  # type: ignore
 from publisher import queued, Publisher
 from resettable_timer import ResettableTimer
 
@@ -31,8 +32,8 @@ class Recorder(Thread):
         self._recording_timeout = None
         self._rearm_timeout = None
         self._last_recorded_event = None
-        self._raw_events = []
-        self._queue = Queue()
+        self._raw_events: List[List[Any]] = []
+        self._queue: Queue[List[Any]] = Queue()
 
     def run(self):
         while True:
