@@ -60,7 +60,7 @@ class Publisher(Thread):
 
     @queued
     def publish_raw_data(self, file_prefix: str, data) -> None:
-        self.google_upload(file_prefix + ".json", "application/json", json.dumps(data))
+        self.google_upload(file_prefix + ".json", "application/json", str.encode(json.dumps(data)))
 
     @queued
     def publish_midi_file(self, file_prefix: str, midi_bytes, public: bool) -> None:
@@ -93,7 +93,6 @@ class Publisher(Thread):
             text=text
         )
 
-    @queued
     def google_upload(self, name: str, mime: str, data) -> str:
         file_metadata = {
             'title': name,
@@ -108,7 +107,6 @@ class Publisher(Thread):
                                                         fields='id').execute()
         return file_insert.get('id')
 
-    @queued
     def slack_upload_public(self, name: str, data) -> None:
         res = self._slack_client.api_call(
             "files.upload",

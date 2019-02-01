@@ -58,7 +58,8 @@ class Keyboard(object):
             self._no_midi_timeout.reset()
 
     def shutdown(self):
-        self._no_midi_timeout.cancel()
+        if not self._no_midi_timeout is None:
+            self._no_midi_timeout.cancel()
         self._timedout = False
 
     def connection_timeout(self):
